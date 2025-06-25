@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: evidence-pdf-processor
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: MAX_CONTENT_LENGTH
+        value: "104857600"  # 100MB
+    healthCheckPath: /health
