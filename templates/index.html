@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>證據文件PDF批次處理程式</title>
+    <title>證據文件PDF批次處理程式 v2.2</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -51,50 +51,11 @@
             overflow-y: auto;
         }
         
-        /* 響應式設計 - 電腦版 (≥992px) */
-        @media (min-width: 992px) {
-            .file-upload-area {
-                min-height: 100px;
-                padding: 20px;
-            }
-            .file-upload-area i {
-                font-size: 2rem;
-            }
-        }
-        
-        /* 響應式設計 - 平板版 (768px-991px) */
-        @media (min-width: 768px) and (max-width: 991px) {
-            .file-upload-area {
-                min-height: 80px;
-                padding: 15px;
-            }
-            .file-upload-area i {
-                font-size: 1.5rem;
-            }
-        }
-        
-        /* 響應式設計 - 手機版 (<768px) */
+        /* 響應式設計 */
         @media (max-width: 767px) {
             .main-container {
                 margin: 10px auto;
                 padding: 0 10px;
-            }
-            .file-upload-area {
-                min-height: 70px;
-                padding: 12px;
-            }
-            .file-upload-area i {
-                font-size: 1.2rem;
-            }
-            .file-upload-area div {
-                font-size: 0.9rem;
-            }
-            .evidence-item {
-                padding: 12px;
-                margin-bottom: 8px;
-            }
-            .card-body {
-                padding: 15px;
             }
             h2 {
                 font-size: 1.5rem;
@@ -153,7 +114,6 @@
                             </div>
                         </div>
                         
-                        
                         <!-- 操作按鈕 -->
                         <div class="d-grid gap-2">
                             <button class="btn btn-success" id="batchProcess" disabled>
@@ -171,11 +131,8 @@
                     <div class="card-header">
                         <h6 class="mb-0">處理進度</h6>
                     </div>
-                    <div class="card-body">
-                        <div class="progress mb-2">
-                            <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
-                        </div>
-                        <div id="progressText" class="text-center small">準備就緒</div>
+                    <div class="card-body text-center">
+                        <div id="progressText"></div>
                     </div>
                 </div>
             </div>
@@ -200,15 +157,14 @@
             <div class="col-12">
                 <div class="alert alert-success" id="resultAlert">
                     <h5><i class="fas fa-check-circle me-2"></i>批次處理完成</h5>
-                    <div id="resultContent"></div>
-                    <div class="download-section" id="downloadSection">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">下載選項</h6>
-                            <button class="btn btn-primary" id="downloadAllBtn" style="display: none;">
+                    <div id="resultSummary"></div>
+                    <div id="resultErrors"></div>
+                    <div class="download-section" id="downloadSection" style="display: none;">
+                        <div class="d-grid">
+                            <a href="#" class="btn btn-primary" id="downloadAllBtn">
                                 <i class="fas fa-download me-1"></i>打包下載全部
-                            </button>
+                            </a>
                         </div>
-                        <div id="individualDownloads"></div>
                     </div>
                 </div>
             </div>
@@ -238,7 +194,7 @@
     
     <script>
         // 全域變數
-        let evidenceData = new Map(); // 存儲每個證據的檔案數據
+        let evidenceData = new Map();
         
         // DOM 元素
         const evidenceType = document.getElementById('evidenceType');
@@ -250,440 +206,224 @@
         const clearAllBtn = document.getElementById('clearAll');
         const evidenceList = document.getElementById('evidenceList');
         const progressCard = document.getElementById('progressCard');
-        const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
         const resultSection = document.getElementById('resultSection');
-        const resultContent = document.getElementById('resultContent');
+        const resultSummary = document.getElementById('resultSummary');
+        const resultErrors = document.getElementById('resultErrors');
         const downloadSection = document.getElementById('downloadSection');
         const downloadAllBtn = document.getElementById('downloadAllBtn');
-        const individualDownloads = document.getElementById('individualDownloads');
-        
+
         // 初始化
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', () => {
             setupEventListeners();
             updateEvidenceList();
         });
-        
+
         function setupEventListeners() {
-            // 證據類型變更
-            evidenceType.addEventListener('change', function() {
-                if (this.value === '其他') {
-                    customType.style.display = 'block';
-                    customType.focus();
-                } else {
-                    customType.style.display = 'none';
-                }
+            evidenceType.addEventListener('change', () => {
+                customType.style.display = (evidenceType.value === '其他') ? 'block' : 'none';
                 updateEvidenceList();
             });
-            
             customType.addEventListener('input', updateEvidenceList);
-            
-            // 編號範圍變更
             startNum.addEventListener('change', updateEvidenceList);
             endNum.addEventListener('change', updateEvidenceList);
             updateListBtn.addEventListener('click', updateEvidenceList);
-            
-            // 操作按鈕
             batchProcessBtn.addEventListener('click', startBatchProcess);
             clearAllBtn.addEventListener('click', clearAllFiles);
-            downloadAllBtn.addEventListener('click', downloadAllFiles);
         }
-        
+
         function getCurrentEvidenceType() {
-            if (evidenceType.value === '其他') {
-                return customType.value.trim() || '其他';
-            }
-            return evidenceType.value;
+            return (evidenceType.value === '其他') ? customType.value.trim() || '其他' : evidenceType.value;
         }
-        
+
         function updateEvidenceList() {
             const type = getCurrentEvidenceType();
             const start = parseInt(startNum.value);
             const end = parseInt(endNum.value);
-            
+
             if (start > end) {
                 endNum.value = start;
                 return;
             }
-            
+
             evidenceList.innerHTML = '';
             evidenceData.clear();
-            
+
             for (let i = start; i <= end; i++) {
                 const evidenceId = `${type}${i}`;
                 createEvidenceItem(evidenceId);
             }
-            
             updateUI();
         }
-        
+
         function createEvidenceItem(evidenceId) {
-            const template = document.getElementById('evidenceItemTemplate');
-            const item = template.content.cloneNode(true);
-            
-            const evidenceItem = item.querySelector('.evidence-item');
-            const label = item.querySelector('.evidence-label');
-            const fileCount = item.querySelector('.file-count');
-            const uploadArea = item.querySelector('.file-upload-area');
-            const fileInput = item.querySelector('.file-input');
-            const fileList = item.querySelector('.file-list');
-            const filesContainer = item.querySelector('.files-container');
-            
+            const template = document.getElementById('evidenceItemTemplate').content.cloneNode(true);
+            const label = template.querySelector('.evidence-label');
+            const uploadArea = template.querySelector('.file-upload-area');
+            const fileInput = template.querySelector('.file-input');
+
             label.textContent = evidenceId + ':';
             uploadArea.dataset.evidence = evidenceId;
-            
-            // 初始化數據
-            evidenceData.set(evidenceId, {
-                files: [],
-                jobId: null,
-                status: 'empty'
-            });
-            
-            // 設定事件監聽器
+            evidenceData.set(evidenceId, { files: [] });
+
             uploadArea.addEventListener('click', () => fileInput.click());
-            uploadArea.addEventListener('dragover', handleDragOver);
-            uploadArea.addEventListener('dragleave', handleDragLeave);
-            uploadArea.addEventListener('drop', (e) => handleDrop(e, evidenceId));
-            fileInput.addEventListener('change', (e) => handleFileSelect(e, evidenceId));
-            
-            evidenceList.appendChild(item);
-        }
-        
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.currentTarget.classList.add('dragover');
-        }
-        
-        function handleDragLeave(e) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('dragover');
-        }
-        
-        function handleDrop(e, evidenceId) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('dragover');
-            const files = Array.from(e.dataTransfer.files);
-            processFiles(files, evidenceId);
-        }
-        
-        function handleFileSelect(e, evidenceId) {
-            const files = Array.from(e.target.files);
-            processFiles(files, evidenceId);
-        }
-        
-        function processFiles(files, evidenceId) {
-            // 過濾允許的檔案類型
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/tiff', 'image/bmp', 'image/gif', 'application/pdf'];
-            const allowedExtensions = ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.gif', '.pdf'];
-            
-            const validFiles = files.filter(file => {
-                const isValidType = allowedTypes.includes(file.type);
-                const hasValidExtension = allowedExtensions.some(ext => 
-                    file.name.toLowerCase().endsWith(ext)
-                );
-                return isValidType || hasValidExtension;
+            uploadArea.addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); });
+            uploadArea.addEventListener('dragleave', e => { e.preventDefault(); e.currentTarget.classList.remove('dragover'); });
+            uploadArea.addEventListener('drop', e => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('dragover');
+                processFiles(Array.from(e.dataTransfer.files), evidenceId);
             });
-            
+            fileInput.addEventListener('change', e => processFiles(Array.from(e.target.files), evidenceId));
+
+            evidenceList.appendChild(template);
+        }
+
+        function processFiles(files, evidenceId) {
+            const allowedExtensions = ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.gif', '.pdf'];
+            const validFiles = files.filter(file => 
+                allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+            );
+
             if (validFiles.length === 0) {
                 alert('請選擇有效的檔案格式 (JPG, PNG, TIFF, PDF 等)');
                 return;
             }
-            
+
             const data = evidenceData.get(evidenceId);
-            data.files = validFiles;
-            data.status = 'ready';
-            
+            data.files.push(...validFiles);
             updateEvidenceDisplay(evidenceId);
             updateUI();
         }
-        
+
         function updateEvidenceDisplay(evidenceId) {
             const data = evidenceData.get(evidenceId);
-            const uploadArea = document.querySelector(`[data-evidence="${evidenceId}"]`);
-            const fileCount = uploadArea.parentNode.querySelector('.file-count');
-            const fileList = uploadArea.parentNode.querySelector('.file-list');
-            const filesContainer = uploadArea.parentNode.querySelector('.files-container');
-            
+            const item = document.querySelector(`[data-evidence="${evidenceId}"]`).closest('.evidence-item');
+            const fileCount = item.querySelector('.file-count');
+            const fileList = item.querySelector('.file-list');
+            const filesContainer = item.querySelector('.files-container');
+
             if (data.files.length === 0) {
                 fileCount.textContent = '未選擇檔案';
-                fileCount.className = 'badge bg-secondary';
+                fileCount.className = 'badge bg-secondary file-count';
                 fileList.style.display = 'none';
             } else {
                 fileCount.textContent = `已選擇 ${data.files.length} 個檔案`;
-                fileCount.className = 'badge bg-primary';
-                
-                // 顯示檔案列表
-                filesContainer.innerHTML = '';
-                data.files.forEach((file, index) => {
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'alert alert-info py-1 px-2 mb-1 d-flex justify-content-between align-items-center';
-                    fileItem.innerHTML = `
+                fileCount.className = 'badge bg-primary file-count';
+                filesContainer.innerHTML = data.files.map((file, index) => `
+                    <div class="alert alert-info py-1 px-2 mb-1 d-flex justify-content-between align-items-center">
                         <small><i class="fas fa-file me-1"></i>${file.name}</small>
                         <button class="btn btn-sm btn-outline-danger py-0" onclick="removeFile('${evidenceId}', ${index})">
                             <i class="fas fa-times"></i>
                         </button>
-                    `;
-                    filesContainer.appendChild(fileItem);
-                });
+                    </div>
+                `).join('');
                 fileList.style.display = 'block';
             }
         }
-        
+
         function removeFile(evidenceId, index) {
             const data = evidenceData.get(evidenceId);
             data.files.splice(index, 1);
-            if (data.files.length === 0) {
-                data.status = 'empty';
-            }
             updateEvidenceDisplay(evidenceId);
             updateUI();
         }
-        
+
         function clearAllFiles() {
-            evidenceData.forEach((data, evidenceId) => {
-                data.files = [];
-                data.status = 'empty';
-                updateEvidenceDisplay(evidenceId);
-            });
-            updateUI();
+            updateEvidenceList();
             hideProgress();
             hideResult();
         }
-        
+
         function updateUI() {
             const hasAnyFiles = Array.from(evidenceData.values()).some(data => data.files.length > 0);
             batchProcessBtn.disabled = !hasAnyFiles;
         }
-        
+
         async function startBatchProcess() {
-            const jobsToProcess = [];
-            
-            // 準備所有需要處理的任務
-            for (const [evidenceId, data] of evidenceData.entries()) {
+            const formData = new FormData();
+            let fileCount = 0;
+
+            evidenceData.forEach((data, evidenceId) => {
                 if (data.files.length > 0) {
-                    jobsToProcess.push({
-                        evidenceId: evidenceId,
-                        files: data.files
+                    data.files.forEach((file, index) => {
+                        formData.append('files', file);
+                        formData.append('evidence_ids', `${evidenceId}_${index}`);
+                        fileCount++;
                     });
                 }
-            }
-            
-            if (jobsToProcess.length === 0) {
+            });
+
+            if (fileCount === 0) {
                 alert('沒有可處理的檔案');
                 return;
             }
-            
+
+            showProgress('<i class="fas fa-spinner fa-spin me-2"></i>正在批次處理中，請稍候...');
+            batchProcessBtn.disabled = true;
+            hideResult();
+
             try {
-                showProgress('開始批次處理...', 0);
-                const results = [];
-                
-                for (let i = 0; i < jobsToProcess.length; i++) {
-                    const job = jobsToProcess[i];
-                    const progress = ((i + 1) / jobsToProcess.length) * 100;
-                    
-                    updateProgress(`處理 ${job.evidenceId} (${i + 1}/${jobsToProcess.length})...`, progress);
-                    
-                    try {
-                        // 上傳檔案
-                        const uploadResult = await uploadJobFiles(job);
-                        
-                        // 處理檔案
-                        const processResult = await processJob(uploadResult, job.evidenceId);
-                        
-                        results.push({
-                            evidenceId: job.evidenceId,
-                            success: true,
-                            downloadUrl: processResult.download_url,
-                            filename: processResult.filename
-                        });
-                        
-                    } catch (error) {
-                        results.push({
-                            evidenceId: job.evidenceId,
-                            success: false,
-                            error: error.message
-                        });
-                    }
+                const response = await fetch('/batch_process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || '伺服器發生未知錯誤');
                 }
-                
-                updateProgress('批次處理完成!', 100);
-                setTimeout(() => {
-                    hideProgress();
-                    showResults(results);
-                }, 1000);
-                
+
+                showResults(result);
+
             } catch (error) {
+                showResults({ success: false, error: error.message });
+            } finally {
                 hideProgress();
-                alert('批次處理失敗: ' + error.message);
+                batchProcessBtn.disabled = false;
             }
         }
-        
-        async function uploadJobFiles(job) {
-            const formData = new FormData();
-            job.files.forEach(file => {
-                formData.append('files', file);
-            });
-            
-            // 從證據ID中提取類型和編號
-            const match = job.evidenceId.match(/^(.+?)(\d+)$/);
-            const evidenceType = match ? match[1] : job.evidenceId;
-            const evidenceNumber = match ? match[2] : '1';
-            
-            formData.append('evidenceType', evidenceType);
-            formData.append('evidenceNumber', evidenceNumber);
-            
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || '上傳失敗');
-            }
-            
-            return await response.json();
-        }
-        
-        async function processJob(uploadResult, evidenceId) {
-            // 從證據ID中提取類型和編號
-            const match = evidenceId.match(/^(.+?)(\d+)$/);
-            const evidenceType = match ? match[1] : evidenceId;
-            const evidenceNumber = match ? match[2] : '1';
-            
-            const response = await fetch('/process', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    job_id: uploadResult.job_id,
-                    evidence_type: evidenceType,
-                    evidence_number: evidenceNumber
-                })
-            });
-            
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || '處理失敗');
-            }
-            
-            return await response.json();
-        }
-        
-        function showProgress(text, percent) {
-            progressText.textContent = text;
-            progressBar.style.width = percent + '%';
-            progressBar.textContent = Math.round(percent) + '%';
+
+        function showProgress(text) {
+            progressText.innerHTML = text;
             progressCard.style.display = 'block';
         }
-        
-        function updateProgress(text, percent) {
-            progressText.textContent = text;
-            progressBar.style.width = percent + '%';
-            progressBar.textContent = Math.round(percent) + '%';
-        }
-        
+
         function hideProgress() {
             progressCard.style.display = 'none';
         }
-        
-        function showResults(results) {
-            const successCount = results.filter(r => r.success).length;
-            const totalCount = results.length;
-            const successResults = results.filter(r => r.success);
-            
-            // 存儲成功的結果供批次下載使用
-            window.currentResults = successResults;
-            
-            resultContent.innerHTML = `
-                <p><strong>處理結果：${successCount}/${totalCount} 成功</strong></p>
-                ${results.some(r => !r.success) ? `
-                    <div class="mb-3">
-                        ${results.filter(r => !r.success).map(result => `
-                            <div class="alert alert-danger py-2 mb-1">
-                                <small><strong>${result.evidenceId}</strong>: ${result.error}</small>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-            `;
-            
-            // 顯示個別下載按鈕
-            individualDownloads.innerHTML = `
-                <div class="row">
-                    ${successResults.map(result => `
-                        <div class="col-lg-4 col-md-6 mb-2">
-                            <div class="d-grid">
-                                <a href="${result.downloadUrl}" class="btn btn-outline-success btn-sm" target="_blank">
-                                    <i class="fas fa-download me-1"></i>${result.evidenceId}
-                                </a>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-            
-            // 顯示批次下載按鈕（如果有成功的結果）
-            if (successCount > 1) {
-                downloadAllBtn.style.display = 'block';
+
+        function showResults(result) {
+            resultSection.style.display = 'block';
+            resultSummary.innerHTML = `<strong>${result.summary || '處理完成'}</strong>`;
+
+            if (result.results && result.results.some(r => !r.success)) {
+                resultErrors.innerHTML = result.results
+                    .filter(r => !r.success)
+                    .map(r => `<div class="alert alert-danger py-2 mb-1"><small><strong>${r.evidenceId}</strong>: ${r.error}</small></div>`)
+                    .join('');
             } else {
-                downloadAllBtn.style.display = 'none';
+                resultErrors.innerHTML = '';
+            }
+
+            if (result.download_url) {
+                downloadAllBtn.href = result.download_url;
+                downloadSection.style.display = 'block';
+            } else {
+                downloadSection.style.display = 'none';
             }
             
-            resultSection.style.display = 'block';
+            if (result.error) {
+                 resultSummary.innerHTML = `<strong>處理失敗</strong>`;
+                 resultErrors.innerHTML = `<div class="alert alert-danger py-2 mb-1"><small>${result.error}</small></div>`;
+            }
         }
-        
+
         function hideResult() {
             resultSection.style.display = 'none';
         }
-        
-        async function downloadAllFiles() {
-            if (!window.currentResults || window.currentResults.length === 0) {
-                alert('沒有可下載的檔案');
-                return;
-            }
-            
-            try {
-                downloadAllBtn.disabled = true;
-                downloadAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>打包中...';
-                
-                // 從 downloadUrl 中提取 job_id
-                const jobIds = window.currentResults.map(result => {
-                    const urlParts = result.downloadUrl.split('/');
-                    return urlParts[urlParts.length - 2]; // job_id 是倒數第二個部分
-                });
-                
-                const response = await fetch('/download_batch_by_jobs', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ job_ids: jobIds })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('批次下載失敗');
-                }
-                
-                // 觸發檔案下載
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `證據檔案批次_${new Date().toISOString().slice(0,10)}.zip`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                
-            } catch (error) {
-                alert('批次下載失敗: ' + error.message);
-            } finally {
-                downloadAllBtn.disabled = false;
-                downloadAllBtn.innerHTML = '<i class="fas fa-download me-1"></i>打包下載全部';
-            }
-        }
+
     </script>
 </body>
 </html>

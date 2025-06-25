@@ -132,9 +132,8 @@ class EvidencePDFConverter:
             
             # 嘗試多個可能的字型位置
             possible_paths = [
-                os.path.join(os.path.dirname(__file__), "kaiu.ttf"),  # 同目錄
-                os.path.join(os.path.dirname(sys.executable), "kaiu.ttf"),  # 執行檔目錄
-                "kaiu.ttf",  # 當前目錄
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "kaiu.ttf"),  # Script's directory
+                os.path.join(os.getcwd(), "kaiu.ttf"), # Working directory
             ]
             
             # 如果是打包環境，檢查資源目錄
